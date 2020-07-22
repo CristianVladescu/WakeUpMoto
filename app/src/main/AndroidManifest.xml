@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android"
-    package="com.example.wakeupmoto">
+    package="com.cdb.wakeupmoto">
 
     <uses-permission android:name="android.permission.WAKE_LOCK" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
@@ -17,21 +17,21 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
-        <activity android:name=".Manual" android:parentActivityName="com.example.wakeupmoto.MainActivity">
+        <activity android:name="com.cdb.wakeupmoto.Manual" android:parentActivityName="com.cdb.wakeupmoto.MainActivity">
             <intent-filter>
-                <action android:name="com.example.wakeupmoto.activities.Manual" />
+                <action android:name="com.cdb.wakeupmoto.activities.Manual" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
-        <activity android:name=".Logs" android:parentActivityName="com.example.wakeupmoto.MainActivity">
+        <activity android:name="com.cdb.wakeupmoto.Logs" android:parentActivityName="com.cdb.wakeupmoto.MainActivity">
             <intent-filter>
-                <action android:name="com.example.wakeupmoto.activities.Logs" />
+                <action android:name="com.cdb.wakeupmoto.activities.Logs" />
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
 
         <receiver
-            android:name=".PhoneStateReceiver"
+            android:name="com.cdb.wakeupmoto.PhoneStateReceiver"
             android:enabled="true"
             android:exported="true">
             <intent-filter>
@@ -40,7 +40,7 @@
             </intent-filter>
         </receiver>
         <receiver
-            android:name=".AutoStartReceiver"
+            android:name="com.cdb.wakeupmoto.AutoStartReceiver"
             android:enabled="true"
             android:exported="true">
             <intent-filter>
@@ -49,11 +49,11 @@
         </receiver>
 
         <service
-            android:name=".WakeUpService"
+            android:name="com.cdb.wakeupmoto.WakeUpService"
             android:enabled="true"
             android:exported="true" />
 
-        <activity android:name=".MainActivity">
+        <activity android:name="com.cdb.wakeupmoto.MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

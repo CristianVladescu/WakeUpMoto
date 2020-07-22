@@ -1,8 +1,7 @@
-package com.example.wakeupmoto
+package com.cdb.wakeupmoto
 
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
-import android.util.Log
 import android.view.View
 import kotlinx.android.synthetic.main.activity_logs.*
 

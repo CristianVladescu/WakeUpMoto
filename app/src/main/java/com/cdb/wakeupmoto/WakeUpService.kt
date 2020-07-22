@@ -1,4 +1,4 @@
-package com.example.wakeupmoto
+package com.cdb.wakeupmoto
 
 import android.app.Notification
 import android.app.NotificationChannel

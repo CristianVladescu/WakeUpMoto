@@ -1,4 +1,4 @@
-package com.example.wakeupmoto
+package com.cdb.wakeupmoto
 
 import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle

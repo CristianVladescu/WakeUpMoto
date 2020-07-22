@@ -1,4 +1,4 @@
-package com.example.wakeupmoto
+package com.cdb.wakeupmoto
 
 import androidx.test.platform.app.InstrumentationRegistry
 import androidx.test.ext.junit.runners.AndroidJUnit4

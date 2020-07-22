@@ -1,4 +1,4 @@
-package com.example.wakeupmoto
+package com.cdb.wakeupmoto
 
 import android.Manifest
 import android.app.AlertDialog
@@ -11,7 +11,6 @@ import android.os.Build
 import android.os.Bundle
 import android.os.IBinder
 import android.os.PowerManager
-import android.widget.Toast
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.preference.Preference

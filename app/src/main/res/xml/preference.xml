@@ -9,7 +9,7 @@
         <Preference
             app:title="Manual"
             app:summary="How it works">
-            <intent android:action="com.example.wakeupmoto.activities.Manual"/>
+            <intent android:action="com.cdb.wakeupmoto.activities.Manual"/>
         </Preference>
     </PreferenceCategory>
     <PreferenceCategory
@@ -64,7 +64,7 @@
         <Preference
             app:title="Logs"
             app:summary="Debugging must be enabled">
-            <intent android:action="com.example.wakeupmoto.activities.Logs"/>
+            <intent android:action="com.cdb.wakeupmoto.activities.Logs"/>
         </Preference>
     </PreferenceCategory>
 </PreferenceScreen>
