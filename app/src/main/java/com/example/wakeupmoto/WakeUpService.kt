@@ -7,14 +7,17 @@ import android.app.Service
 import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
+import android.content.SharedPreferences
 import android.hardware.*
 import android.hardware.display.DisplayManager
+import android.icu.util.Calendar
 import android.os.Binder
 import android.os.IBinder
 import android.os.PowerManager
 import android.util.Log
 import android.view.Display
 import android.widget.Toast
+import androidx.preference.PreferenceManager
 
 
 const val NOTIFICATION_CHANNEL_ID = 0
@@ -58,18 +61,13 @@ class PhoneState {
     var liftToView = false
     var liftToSilence = false
     var flipToMute = false
-    var displayOnPreviously = false
+    var displayOnPreviously = false // display is physically light up (when Moto Display or anything else)
     var displayTurnedOnByUser = false
-    var userInteractedSinceDisplayOn = false
+    var screenOnSinceDisplayOn = false // not true if only Moto Display is shown; only when unlock screen is shown it flips
+    var screenUnlockedSinceDisplayOn = false
+    var callAnsweredSinceDisplayOn = false
 }
 val phoneState = PhoneState()
-
-
-var notificationsAlertCooldown = 0
-var unreadNotifications = false
-var unreadNotificationsCooldown = 0
-
-
 
 class StringCircularBuffer {
     var array: Array<String>
@@ -81,18 +79,25 @@ class StringCircularBuffer {
     }
 
     fun add(entry: String) {
-        array[start] = entry
+        array[end] = entry
         end = (end + 1) % array.size
         if (start == end)
             start = (start + 1) % array.size
     }
 }
 
+lateinit var preferences: SharedPreferences
+var enabled = true
+var debug = true
+
+
 const val LOGGER_TAG = "WakeUpMoto::Logger"
 var logs = StringCircularBuffer(100)
 fun log(msg: String){
-    logs.add(msg)
-    Log.d(LOGGER_TAG, msg)
+    if (debug){
+        logs.add(msg)
+        Log.d(LOGGER_TAG, msg)
+    }
 }
 
 class WakeUpService : Service() {
@@ -102,6 +107,15 @@ class WakeUpService : Service() {
 
     private lateinit var sensorManager: SensorManager
     private lateinit var screenLock: PowerManager.WakeLock
+    private var notificationsAlertCooldown = 0
+    private var unreadNotifications = false
+    private var unreadNotificationsCooldown = 0
+    private var firstAlertTime = 0.toLong()
+    var displayCheckInterval = -1
+    var wakeUpInterval = -1
+    var wakeUpStop = -1
+    var wakeUpSuppressedAfter = -1
+    var wakeUpSuppressedUntil = -1
 
     inner class LocalBinder : Binder() {
         // Return this instance of WakeUpService so clients can call public methods
@@ -135,6 +149,14 @@ class WakeUpService : Service() {
     }
 
     override fun onCreate() {
+        preferences = PreferenceManager.getDefaultSharedPreferences(this)
+        debug = preferences.getBoolean("debug", false)
+        displayCheckInterval = preferences.getString("display_check_interval", "0")?.toInt()!!
+        wakeUpInterval = preferences.getString("wake_up_interval", "0")?.toInt()!!
+        wakeUpStop = preferences.getString("wake_up_stop", "0")?.toInt()!!
+        wakeUpSuppressedAfter = preferences.getString("wake_up_suppressed_after", "0")?.toInt()!!
+        wakeUpSuppressedUntil = preferences.getString("wake_up_suppressed_until", "0")?.toInt()!!
+
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager;
         displayManager = getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
         
@@ -146,21 +168,6 @@ class WakeUpService : Service() {
                 NotificationManager::class.java
             )
         notificationManager!!.createNotificationChannel(channel)
-
-//        val notifyBuilder =
-//            NotificationCompat.Builder(this, NOTIFICATION_CHANNEL_STRING)
-//                .setContentTitle("You've been notified!")
-//                .setContentText("This is your notification text.")
-//                .setSmallIcon(R.drawable.ic_launcher_background)
-//
-//
-//        val myNotification: Notification = notifyBuilder.build()
-//        val mNotifyManager = getSystemService(NOTIFICATION_SERVICE) as NotificationManager
-//        mNotifyManager.notify(NOTIFICATION_CHANNEL_ID, myNotification)
-
-
-
-
     }
 
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
@@ -222,7 +229,7 @@ class WakeUpService : Service() {
                     for (display in displayManager.displays) {
                         if (display.state != Display.STATE_OFF) {
                             displayOn = true
-//                            if (phoneState.userInteractedSinceDisplayOn){
+//                            if (phoneState.screenUnlockedSinceDisplayOn){
 //                                phoneState.displayTurnedOnByUser = true
 //                            }
                             break
@@ -233,23 +240,40 @@ class WakeUpService : Service() {
                         if (unreadNotifications && notificationsAlertCooldown == 0 && !phoneState.displayTurnedOnByUser && unreadNotificationsCooldown == 0)
                         {
                             log( "Unread notifications");
-                            notificationsAlertCooldown = 0
-                            screenLock =
-                                (getSystemService(Context.POWER_SERVICE) as PowerManager).newWakeLock(
-                                    PowerManager.SCREEN_DIM_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP, LOGGER_TAG
-                                )
-                            screenLock.acquire()
-                            screenLock.release()
+                            notificationsAlertCooldown = wakeUpInterval
+                            if (wakeUpStop == 0 || firstAlertTime == 0L || System.currentTimeMillis() < firstAlertTime + wakeUpStop*60*1000) {
+                                val currentHour = Calendar.getInstance().get(Calendar.HOUR_OF_DAY)
+                                if (currentHour < wakeUpSuppressedAfter || currentHour >= wakeUpSuppressedUntil) {
+                                    screenLock =
+                                        (getSystemService(Context.POWER_SERVICE) as PowerManager).newWakeLock(
+                                            PowerManager.SCREEN_DIM_WAKE_LOCK or PowerManager.ACQUIRE_CAUSES_WAKEUP, LOGGER_TAG
+                                        )
+                                    screenLock.acquire()
+                                    screenLock.release()
+                                    // suppress/sync with ACTION_USER_PRESENT broadcast message which was triggered by acquiring the screen lock when there is no lock mechanism activated
+                                    //phoneState.screenUnlockedSinceDisplayOn = false // reset since it was not done by user
+                                    if (firstAlertTime == 0L)
+                                        firstAlertTime = System.currentTimeMillis()
+                                }
+                            }
                         }
                         else {
                             if (phoneState.displayOnPreviously)
                             {
                                 log("Reset phone state")
                                 if (unreadNotifications && phoneState.displayTurnedOnByUser)
+                                    // if motion sensor is triggered while screen lock acquired (not Moto Display)
+                                    // after lock screen is released, the Moto Displayed is shown as well, so it must be ignored and not treated as a notification
+                                    // basically if the phone is moved during the lock screen, Moto Display is queued to be shown after display turns off
+                                    // since the Moto Display is shown for 5 seconds, 10 will suffice
                                     unreadNotificationsCooldown = 10
-                                unreadNotifications = !phoneState.displayTurnedOnByUser && unreadNotificationsCooldown == 0
-                                phoneState.userInteractedSinceDisplayOn = false
+                                unreadNotifications = !phoneState.displayTurnedOnByUser && unreadNotificationsCooldown == 0 && !phoneState.callAnsweredSinceDisplayOn //&& !phoneState.screenUnlockedSinceDisplayOn
+                                if (!unreadNotifications)
+                                    firstAlertTime = 0
+                                phoneState.screenOnSinceDisplayOn = false
+                                phoneState.screenUnlockedSinceDisplayOn = false
                                 phoneState.displayTurnedOnByUser = false
+                                phoneState.callAnsweredSinceDisplayOn = false
                             }
                             if (notificationsAlertCooldown > 0)
                                 notificationsAlertCooldown--
@@ -259,7 +283,12 @@ class WakeUpService : Service() {
                     }
 
                     phoneState.displayOnPreviously = displayOn
-                    Thread.sleep(1000)
+                    if (!enabled){
+                        stopForeground(true)
+                        stopSelf()
+                        break
+                    }
+                    Thread.sleep((displayCheckInterval*1000).toLong())
                 }
             })
             thread!!.start()
@@ -267,11 +296,12 @@ class WakeUpService : Service() {
             log("Monitoring thread already started")
         }
         log("Service started")
+
         return START_STICKY
     }
 
     override fun onDestroy() {
-        Toast.makeText(this, "My Service Stopped", Toast.LENGTH_LONG).show()
+        Toast.makeText(this, "Wake Up Moto stopped", Toast.LENGTH_LONG).show()
         log("Service stopped")
     }
 }

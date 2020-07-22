@@ -1,19 +1,23 @@
 package com.example.wakeupmoto
 
 import android.Manifest
+import android.app.AlertDialog
 import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.ServiceConnection
+import android.content.SharedPreferences.OnSharedPreferenceChangeListener
 import android.os.Build
-import androidx.appcompat.app.AppCompatActivity
 import android.os.Bundle
 import android.os.IBinder
 import android.os.PowerManager
 import android.widget.Toast
+import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
+import androidx.preference.PreferenceManager
+
 
 private const val TITLE_TAG = "settingsActivityTitle"
 
@@ -35,11 +39,26 @@ class MainActivity : AppCompatActivity(), PreferenceFragmentCompat.OnPreferenceS
         }
     }
 
+    private val prefListener = OnSharedPreferenceChangeListener { prefs, key ->
+        if (key == "enabled") {
+            enabled = prefs.getBoolean(key, false)
+            if (enabled) {
+                val serviceIntent = Intent(this, WakeUpService::class.java)
+                startService(serviceIntent)
+            }
+        }
+        if (key == "debug") { debug = prefs.getBoolean(key, false) }
+        if (key == "displayCheckInterval") { mService.displayCheckInterval = prefs.getString(key, "0")?.toInt()!! }
+        if (key == "wake_up_interval") { mService.wakeUpInterval = prefs.getString(key, "0")?.toInt()!! }
+        if (key == "wake_up_stop") { mService.wakeUpStop = prefs.getString(key, "0")?.toInt()!! }
+        if (key == "wake_up_suppressed_after") { mService.wakeUpSuppressedAfter = prefs.getString(key, "0")?.toInt()!! }
+        if (key == "wake_up_suppressed_until") { mService.wakeUpSuppressedUntil = prefs.getString(key, "0")?.toInt()!! }
+    }
+
+
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
-
-        ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.READ_PHONE_STATE, Manifest.permission.WAKE_LOCK), 0)
 
         if (savedInstanceState == null) {
             supportFragmentManager
@@ -57,19 +76,32 @@ class MainActivity : AppCompatActivity(), PreferenceFragmentCompat.OnPreferenceS
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
 
-//        // Bind to LocalService
-//        Intent(this, WakeUpService::class.java).also { intent ->
-//            bindService(intent, connection, Context.BIND_AUTO_CREATE)
-//        }
+        ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.READ_PHONE_STATE, Manifest.permission.WAKE_LOCK, Manifest.permission.FOREGROUND_SERVICE, Manifest.permission.RECEIVE_BOOT_COMPLETED), 0)
 
         if (Build.VERSION.SDK_INT >= 26 && !(getSystemService(Context.POWER_SERVICE) as PowerManager)?.isIgnoringBatteryOptimizations(packageName)) {
-            Toast.makeText(this, "Battery Optimization is enabled for $packageName and will stop the service", Toast.LENGTH_LONG).show()
+            AlertDialog.Builder(this).setMessage("Battery Optimization is enabled for $packageName and it will stop the service when phone is idle").setTitle("Warning").create().show()
         }
 
-        val serviceIntent = Intent(this, WakeUpService::class.java)
-//        startService(serviceIntent)
-        startForegroundService(serviceIntent)
+        if (Build.MODEL != "motorola one zoom")
+            AlertDialog.Builder(this).setMessage("This app is meant for Motorola phones and was developed on Motorola One Zoom. It might not work with your model, ${Build.MODEL}").setTitle("Warning").create().show()
 
+        preferences = PreferenceManager.getDefaultSharedPreferences(this)
+        enabled = preferences.getBoolean("enabled", false)
+        debug = preferences.getBoolean("debug", false)
+        if (enabled){
+            val serviceIntent = Intent(this, WakeUpService::class.java)
+            startForegroundService(serviceIntent)
+            //        // Bind to LocalService
+            Intent(this, WakeUpService::class.java).also { intent ->
+                bindService(intent, connection, Context.BIND_AUTO_CREATE)
+            }
+        }
+        preferences.registerOnSharedPreferenceChangeListener(prefListener)
+    }
+
+    override fun onDestroy() {
+        preferences.unregisterOnSharedPreferenceChangeListener(prefListener)
+        super.onDestroy()
     }
 
     override fun onPreferenceStartFragment(caller: PreferenceFragmentCompat, pref: Preference): Boolean {
@@ -91,13 +123,10 @@ class MainActivity : AppCompatActivity(), PreferenceFragmentCompat.OnPreferenceS
         return true
     }
 
-    /**
-     * The root preference fragment that displays preferences that link to the other preference
-     * fragments below.
-     */
     class SettingsFragment : PreferenceFragmentCompat() {
         override fun onCreatePreferences(savedInstanceState: Bundle?, rootKey: String?) {
-            setPreferencesFromResource(R.xml.root, rootKey)
+            setPreferencesFromResource(R.xml.preference, rootKey)
         }
     }
 }
+

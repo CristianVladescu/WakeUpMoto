@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<PreferenceScreen
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:android="http://schemas.android.com/apk/res/android">
+    <PreferenceCategory
+        app:key="help"
+        app:title="Help"
+        app:initialExpandedChildrenCount="1">
+        <Preference
+            app:title="Manual"
+            app:summary="How it works">
+            <intent android:action="com.example.wakeupmoto.activities.Manual"/>
+        </Preference>
+    </PreferenceCategory>
+    <PreferenceCategory
+        app:key="settings"
+        app:title="Settings"
+        app:initialExpandedChildrenCount="10">
+        <SwitchPreference
+            android:defaultValue="true"
+            android:key="enabled"
+            android:title="Enabled"
+            android:summary="Whether or not the service is enabled, causing the screen to light up until missed notifications are read"/>
+        <EditTextPreference
+            app:key="display_check_interval"
+            app:title="Interval in seconds for checking if a notification arrived. Must be lower than 3 seconds, which is the duration the screen is on when a notification arrives"
+            app:useSimpleSummaryProvider="true"
+            app:dialogTitle="Enter the number of seconds" app:defaultValue="1"
+            android:dialogLayout="@layout/number_edit_preference"/>
+        <EditTextPreference
+            app:key="wake_up_interval"
+            app:title="Interval in seconds for lighting up the screen when a notification is missed"
+            app:useSimpleSummaryProvider="true"
+            app:dialogTitle="Enter the number of seconds" app:defaultValue="60"
+            android:dialogLayout="@layout/number_edit_preference"/>
+        <EditTextPreference
+            app:key="wake_up_stop"
+            app:title="Timeout in minutes after which screen will stop waking up if user doesn\'t notice it (0 = never)"
+            app:useSimpleSummaryProvider="true"
+            app:dialogTitle="Enter the number of minutes" app:defaultValue="0"
+            android:dialogLayout="@layout/number_edit_preference"/>
+        <EditTextPreference
+            app:key="wake_up_suppressed_after"
+            app:title="Hour after which wake up is suppressed (00 - 23)"
+            app:useSimpleSummaryProvider="true"
+            app:dialogTitle="Enter the hour of the day (00 - 23)" app:defaultValue="0"
+            android:dialogLayout="@layout/number_edit_preference"/>
+        <EditTextPreference
+            app:key="wake_up_suppressed_until"
+            app:title="Hour until which wake up is suppressed (00 - 23)"
+            app:useSimpleSummaryProvider="true"
+            app:dialogTitle="Enter the hour of the day (00 - 23)" app:defaultValue="0"
+            android:dialogLayout="@layout/number_edit_preference"/>
+    </PreferenceCategory>
+    <PreferenceCategory
+        app:key="debugging"
+        app:title="Debugging"
+        app:initialExpandedChildrenCount="10">
+        <SwitchPreference
+            android:defaultValue="false"
+            android:key="debug"
+            android:title="Debugging enabled"
+            android:summary="Whether or not the debugging is enabled"/>
+        <Preference
+            app:title="Logs"
+            app:summary="Debugging must be enabled">
+            <intent android:action="com.example.wakeupmoto.activities.Logs"/>
+        </Preference>
+    </PreferenceCategory>
+</PreferenceScreen>

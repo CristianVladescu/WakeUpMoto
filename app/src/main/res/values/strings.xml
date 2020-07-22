@@ -1,18 +1,6 @@
 <resources>
     <string name="app_name">Wake Up Moto</string>
     <string name="title_activity_logs">Logs</string>
-    <!--
-    This string is used for square devices and overridden by hello_world in
-    values-round/strings.xml for round devices.
-    -->
-    <string name="hello_world">Hello Square World!</string>
-    <string name="title_activity_main2">MainActivity2</string>
-    <!-- Strings used for fragments for navigation -->
-    <string name="first_fragment_label">First Fragment</string>
-    <string name="second_fragment_label">Second Fragment</string>
-    <string name="next">Next</string>
-    <string name="previous">Previous</string>
-
-    <string name="hello_first_fragment">Hello first fragment</string>
-    <string name="hello_second_fragment">Hello second fragment. Arg: %1$s</string>
+    <string name="manual">Because Motorola phones light up only once when new notifications arrive, if you leave the phone on a desk for long periods of time, you have to constantly approach it to check if you missed any notifications.\n\nTo mitigate this problem, this app will periodically light up the screen once a new notification arrives, until it catches your attention and read it.\n\nApps are very system restricted these days and the only way to do this is by having a foreground service (this means a persistent sticky notification that cannot be dismissed while the service is running) periodically check if the display is on while the phone is completely stationary. So if the display turned on without anyone touching the device, it means that a notification was received. This is the only mechanism available that will be used to detect if a notification was received. Once a notification is received, the app will keep lighting up the display until motion sensors are triggered, which would indicate that the user likely picked up the phone and noticed the alerts. The screen won\'t light up if the phone is face down, obviously.\n\nTo make matters worse, if Moto Display is turned off, the screen won\'t light up at all when new notifications arrive and this app won\'t work. So make sure Moto Display (Peek Display) is turned on.
+    </string>
 </resources>
