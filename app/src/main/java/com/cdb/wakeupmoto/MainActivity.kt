@@ -47,11 +47,11 @@ class MainActivity : AppCompatActivity(), PreferenceFragmentCompat.OnPreferenceS
             }
         }
         if (key == "debug") { debug = prefs.getBoolean(key, false) }
-        if (key == "displayCheckInterval") { mService.displayCheckInterval = prefs.getString(key, "0")?.toInt()!! }
-        if (key == "wake_up_interval") { mService.wakeUpInterval = prefs.getString(key, "0")?.toInt()!! }
-        if (key == "wake_up_stop") { mService.wakeUpStop = prefs.getString(key, "0")?.toInt()!! }
-        if (key == "wake_up_suppressed_after") { mService.wakeUpSuppressedAfter = prefs.getString(key, "0")?.toInt()!! }
-        if (key == "wake_up_suppressed_until") { mService.wakeUpSuppressedUntil = prefs.getString(key, "0")?.toInt()!! }
+        if (key == "displayCheckInterval" && mBound) { mService.displayCheckInterval = prefs.getString(key, "0")?.toInt()!! }
+        if (key == "wake_up_interval" && mBound) { mService.wakeUpInterval = prefs.getString(key, "0")?.toInt()!! }
+        if (key == "wake_up_stop" && mBound) { mService.wakeUpStop = prefs.getString(key, "0")?.toInt()!! }
+        if (key == "wake_up_suppressed_after" && mBound) { mService.wakeUpSuppressedAfter = prefs.getString(key, "0")?.toInt()!! }
+        if (key == "wake_up_suppressed_until" && mBound) { mService.wakeUpSuppressedUntil = prefs.getString(key, "0")?.toInt()!! }
     }
 
 
