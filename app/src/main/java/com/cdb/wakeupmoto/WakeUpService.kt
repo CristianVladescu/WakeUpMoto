@@ -61,10 +61,10 @@ class PhoneState {
     var liftToView = false
     var liftToSilence = false
     var flipToMute = false
-    var displayOnPreviously = false // display is physically light up (when Moto Display or anything else)
+    var displayOnPreviously = true // display is physically light up (when Moto Display or anything else)
     var displayTurnedOnByUser = false
     var screenOnSinceDisplayOn = false // not true if only Moto Display is shown; only when unlock screen is shown it flips
-    var screenUnlockedSinceDisplayOn = false
+    var screenUnlockedSinceDisplayOn = true
     var callAnsweredSinceDisplayOn = false
 }
 val phoneState = PhoneState()
@@ -232,6 +232,8 @@ class WakeUpService : Service() {
 //                            if (phoneState.screenUnlockedSinceDisplayOn){
 //                                phoneState.displayTurnedOnByUser = true
 //                            }
+                            if (!phoneState.displayOnPreviously)
+                                log( "Display on")
                             break
                         }
                     }
@@ -260,7 +262,7 @@ class WakeUpService : Service() {
                         else {
                             if (phoneState.displayOnPreviously)
                             {
-                                log("Reset phone state")
+                                log("Display off")
                                 if (unreadNotifications && phoneState.displayTurnedOnByUser)
                                     // if motion sensor is triggered while screen lock acquired (not Moto Display)
                                     // after lock screen is released, the Moto Displayed is shown as well, so it must be ignored and not treated as a notification
