@@ -2,23 +2,21 @@ package com.cdb.wakeupmoto
 
 import android.Manifest
 import android.app.AlertDialog
-import android.content.ComponentName
-import android.content.Context
-import android.content.Intent
-import android.content.ServiceConnection
+import android.app.PendingIntent.FLAG_NO_CREATE
+import android.app.PendingIntent.getActivity
+import android.content.*
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener
-import android.os.Build
-import android.os.Bundle
-import android.os.IBinder
-import android.os.PowerManager
+import android.os.*
 import androidx.appcompat.app.AppCompatActivity
 import androidx.core.app.ActivityCompat
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.preference.Preference
 import androidx.preference.PreferenceFragmentCompat
 import androidx.preference.PreferenceManager
 
 
 private const val TITLE_TAG = "settingsActivityTitle"
+var mainActivity: MainActivity? = null
 
 class MainActivity : AppCompatActivity(), PreferenceFragmentCompat.OnPreferenceStartFragmentCallback {
     private lateinit var mService: WakeUpService
@@ -43,7 +41,10 @@ class MainActivity : AppCompatActivity(), PreferenceFragmentCompat.OnPreferenceS
             enabled = prefs.getBoolean(key, false)
             if (enabled) {
                 val serviceIntent = Intent(this, WakeUpService::class.java)
-                startService(serviceIntent)
+                startForegroundService(serviceIntent)
+                Intent(this, WakeUpService::class.java).also { intent ->
+                    bindService(intent, connection, Context.BIND_AUTO_CREATE)
+                }
             }
         }
         if (key == "debug") { debug = prefs.getBoolean(key, false) }
@@ -54,10 +55,21 @@ class MainActivity : AppCompatActivity(), PreferenceFragmentCompat.OnPreferenceS
         if (key == "wake_up_suppressed_until" && mBound) { mService.wakeUpSuppressedUntil = prefs.getString(key, "0")?.toInt()!! }
     }
 
+    private val mMessageReceiver: BroadcastReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context, intent: Intent) {
+            // Get extra data included in the Intent
+            val message = intent.getStringExtra("key")
+            mainActivity?.runOnUiThread(java.lang.Runnable {
+                    AlertDialog.Builder(mainActivity).setMessage(message).setTitle("Wake Up Moto Error").create().show()
+            })
+            // Toast.makeText(context, message, Toast.LENGTH_SHORT).show();
+        }
+    }
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_main)
+        mainActivity = this
 
         if (savedInstanceState == null) {
             supportFragmentManager
@@ -74,31 +86,45 @@ class MainActivity : AppCompatActivity(), PreferenceFragmentCompat.OnPreferenceS
         }
         supportActionBar?.setDisplayHomeAsUpEnabled(true)
 
-
         ActivityCompat.requestPermissions(this, arrayOf(Manifest.permission.READ_PHONE_STATE, Manifest.permission.WAKE_LOCK, Manifest.permission.FOREGROUND_SERVICE, Manifest.permission.RECEIVE_BOOT_COMPLETED), 0)
 
+        preferences = PreferenceManager.getDefaultSharedPreferences(this)
+        enabled = preferences.getBoolean("enabled", false)
+        debug = preferences.getBoolean("debug", false)
+
+        preferences.registerOnSharedPreferenceChangeListener(prefListener)
+
         if (Build.VERSION.SDK_INT >= 26 && !(getSystemService(Context.POWER_SERVICE) as PowerManager)?.isIgnoringBatteryOptimizations(packageName)) {
-            AlertDialog.Builder(this).setMessage("Battery Optimization is enabled for $packageName and it will stop the service when phone is idle").setTitle("Warning").create().show()
+            AlertDialog.Builder(this).setMessage("Battery Optimization is enabled for $packageName and it could stop the service when phone is idle").setTitle("Warning").create().show()
         }
 
         if (Build.MODEL != "motorola one zoom")
             AlertDialog.Builder(this).setMessage("This app is meant for Motorola phones and was developed on Motorola One Zoom. It might not work with your model, ${Build.MODEL}").setTitle("Warning").create().show()
 
-        preferences = PreferenceManager.getDefaultSharedPreferences(this)
-        enabled = preferences.getBoolean("enabled", false)
-        debug = preferences.getBoolean("debug", false)
+        for (error in errors)
+            AlertDialog.Builder(this).setMessage(error).setTitle("Wake Up Moto Error").create().show()
+    }
+
+    override fun onStart() {
+        super.onStart()
+        LocalBroadcastManager.getInstance(this).registerReceiver(mMessageReceiver, IntentFilter("intentKey"));
         if (enabled){
             val serviceIntent = Intent(this, WakeUpService::class.java)
             startForegroundService(serviceIntent)
-            //        // Bind to LocalService
             Intent(this, WakeUpService::class.java).also { intent ->
                 bindService(intent, connection, Context.BIND_AUTO_CREATE)
             }
         }
-        preferences.registerOnSharedPreferenceChangeListener(prefListener)
+
+    }
+
+    override fun onStop() {
+        LocalBroadcastManager.getInstance(this).unregisterReceiver(mMessageReceiver)
+        super.onStop()
     }
 
     override fun onDestroy() {
+        mainActivity = null
         preferences.unregisterOnSharedPreferenceChangeListener(prefListener)
         super.onDestroy()
     }

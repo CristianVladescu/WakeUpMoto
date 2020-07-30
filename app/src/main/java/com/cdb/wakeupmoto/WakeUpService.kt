@@ -17,7 +17,9 @@ import android.os.PowerManager
 import android.util.Log
 import android.view.Display
 import android.widget.Toast
+import androidx.localbroadcastmanager.content.LocalBroadcastManager
 import androidx.preference.PreferenceManager
+import java.time.LocalDateTime
 
 
 const val NOTIFICATION_CHANNEL_ID = 0
@@ -89,13 +91,13 @@ class StringCircularBuffer {
 lateinit var preferences: SharedPreferences
 var enabled = true
 var debug = true
-
+var errors = mutableListOf<String>()
 
 const val LOGGER_TAG = "WakeUpMoto::Logger"
 var logs = StringCircularBuffer(100)
 fun log(msg: String){
     if (debug){
-        logs.add(msg)
+        logs.add(LocalDateTime.now().toString() + ": " + msg)
         Log.d(LOGGER_TAG, msg)
     }
 }
@@ -104,7 +106,6 @@ class WakeUpService : Service() {
     private lateinit var displayManager: DisplayManager
     private val binder = LocalBinder()
     private var thread: Thread? = null
-
     private lateinit var sensorManager: SensorManager
     private lateinit var screenLock: PowerManager.WakeLock
     private var notificationsAlertCooldown = 0
@@ -148,7 +149,13 @@ class WakeUpService : Service() {
         return binder
     }
 
+    private fun addError(msg: String){
+        errors.add(msg)
+        LocalBroadcastManager.getInstance(this).sendBroadcast(Intent("intentKey").putExtra("key", msg))
+    }
+
     override fun onCreate() {
+//        errorsReady.tryLock()
         preferences = PreferenceManager.getDefaultSharedPreferences(this)
         debug = preferences.getBoolean("debug", false)
         displayCheckInterval = preferences.getString("display_check_interval", "0")?.toInt()!!
@@ -173,8 +180,6 @@ class WakeUpService : Service() {
     override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
         log("Starting service")
 
-
-
         if (thread?.isAlive != true){
             val builder: Notification.Builder = Notification.Builder(this, NOTIFICATION_CHANNEL_STRING)
                 .setContentTitle(getString(R.string.app_name))
@@ -198,6 +203,10 @@ class WakeUpService : Service() {
             registerReceiver(phoneStateReceiver, filter);
 
             val sensorList = sensorManager.getSensorList(Sensor.TYPE_ALL)
+            errors.clear()
+            if (!sensorList.any() { it.type == MotoSensors.MOTO_GLANCE_APPROACH_SENSOR.type }) { addError("Could not find ${MotoSensors.MOTO_GLANCE_APPROACH_SENSOR.name} sensor") }
+            if (!sensorList.any() { it.type == MotoSensors.MOTO_GLANCE_SENSOR.type }) { addError("Could not find ${MotoSensors.MOTO_GLANCE_SENSOR.name} sensor") }
+
             for (sensor in sensorList) {
                 if (sensor.isWakeUpSensor && sensor.type in MotoSensors.values().map { i -> i.type}){
                     log("Sensor: $sensor ${sensor.fifoMaxEventCount} ${sensor.fifoReservedEventCount}")
@@ -224,6 +233,7 @@ class WakeUpService : Service() {
 
             thread = Thread(Runnable {
 
+                var lastTime = System.currentTimeMillis()
                 while (true){
                     var displayOn = false
                     for (display in displayManager.displays) {
@@ -239,7 +249,7 @@ class WakeUpService : Service() {
                     }
 
                     if (!displayOn) {
-                        if (unreadNotifications && notificationsAlertCooldown == 0 && !phoneState.displayTurnedOnByUser && unreadNotificationsCooldown == 0)
+                        if (unreadNotifications && notificationsAlertCooldown <= 0 && !phoneState.displayTurnedOnByUser && unreadNotificationsCooldown <= 0 && !phoneState.stowed)
                         {
                             log( "Unread notifications");
                             notificationsAlertCooldown = wakeUpInterval
@@ -269,7 +279,7 @@ class WakeUpService : Service() {
                                     // basically if the phone is moved during the lock screen, Moto Display is queued to be shown after display turns off
                                     // since the Moto Display is shown for 5 seconds, 10 will suffice
                                     unreadNotificationsCooldown = 10
-                                unreadNotifications = !phoneState.displayTurnedOnByUser && unreadNotificationsCooldown == 0 && !phoneState.callAnsweredSinceDisplayOn //&& !phoneState.screenUnlockedSinceDisplayOn
+                                unreadNotifications = !phoneState.displayTurnedOnByUser && unreadNotificationsCooldown <= 0 && !phoneState.callAnsweredSinceDisplayOn //&& !phoneState.screenUnlockedSinceDisplayOn
                                 if (!unreadNotifications)
                                     firstAlertTime = 0
                                 phoneState.screenOnSinceDisplayOn = false
@@ -278,10 +288,12 @@ class WakeUpService : Service() {
                                 phoneState.callAnsweredSinceDisplayOn = false
                             }
                             if (notificationsAlertCooldown > 0)
-                                notificationsAlertCooldown--
+                                notificationsAlertCooldown -= ((System.currentTimeMillis() - lastTime)/1000).toInt()
                             if (unreadNotificationsCooldown > 0)
-                                unreadNotificationsCooldown--
+                                unreadNotificationsCooldown -= ((System.currentTimeMillis() - lastTime)/1000).toInt()
+                            lastTime = System.currentTimeMillis()
                         }
+//                        log("${unreadNotifications} $notificationsAlertCooldown ${phoneState.displayTurnedOnByUser} $unreadNotificationsCooldown")
                     }
 
                     phoneState.displayOnPreviously = displayOn
@@ -290,7 +302,7 @@ class WakeUpService : Service() {
                         stopSelf()
                         break
                     }
-                    Thread.sleep((displayCheckInterval*1000).toLong())
+                    Thread.sleep((if (displayCheckInterval > 0) displayCheckInterval*1000 else 1000).toLong())
                 }
             })
             thread!!.start()
