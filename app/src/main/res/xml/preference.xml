@@ -5,11 +5,15 @@
     <PreferenceCategory
         app:key="help"
         app:title="Help"
-        app:initialExpandedChildrenCount="1">
+        app:initialExpandedChildrenCount="10">
         <Preference
             app:title="Manual"
             app:summary="How it works">
             <intent android:action="com.cdb.wakeupmoto.activities.Manual"/>
+        </Preference>
+        <Preference
+            app:title="Privacy policy">
+            <intent android:action="com.cdb.wakeupmoto.activities.Privacy"/>
         </Preference>
     </PreferenceCategory>
     <PreferenceCategory

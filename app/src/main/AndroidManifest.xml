@@ -14,21 +14,34 @@
         android:roundIcon="@mipmap/ic_launcher_round"
         android:supportsRtl="true"
         android:theme="@style/AppTheme">
-        <activity android:name="com.cdb.wakeupmoto.Manual" android:parentActivityName="com.cdb.wakeupmoto.MainActivity">
+        <activity android:name=".Privacy" android:parentActivityName=".MainActivity">
             <intent-filter>
-                <action android:name="com.cdb.wakeupmoto.activities.Manual" />
+                <action android:name="com.cdb.wakeupmoto.activities.Privacy" />
+
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
-        <activity android:name="com.cdb.wakeupmoto.Logs" android:parentActivityName="com.cdb.wakeupmoto.MainActivity">
+        <activity
+            android:name=".Manual"
+            android:parentActivityName=".MainActivity">
+            <intent-filter>
+                <action android:name="com.cdb.wakeupmoto.activities.Manual" />
+
+                <category android:name="android.intent.category.DEFAULT" />
+            </intent-filter>
+        </activity>
+        <activity
+            android:name=".Logs"
+            android:parentActivityName=".MainActivity">
             <intent-filter>
                 <action android:name="com.cdb.wakeupmoto.activities.Logs" />
+
                 <category android:name="android.intent.category.DEFAULT" />
             </intent-filter>
         </activity>
 
         <receiver
-            android:name="com.cdb.wakeupmoto.PhoneStateReceiver"
+            android:name=".PhoneStateReceiver"
             android:enabled="true"
             android:exported="true">
             <intent-filter>
@@ -37,7 +50,7 @@
             </intent-filter>
         </receiver>
         <receiver
-            android:name="com.cdb.wakeupmoto.AutoStartReceiver"
+            android:name=".AutoStartReceiver"
             android:enabled="true"
             android:exported="true">
             <intent-filter>
@@ -46,13 +59,14 @@
         </receiver>
 
         <service
-            android:name="com.cdb.wakeupmoto.WakeUpService"
+            android:name=".WakeUpService"
             android:enabled="true"
             android:exported="true" />
 
-        <activity android:name="com.cdb.wakeupmoto.MainActivity">
+        <activity android:name=".MainActivity">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
+
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
