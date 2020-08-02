@@ -8,6 +8,7 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
+import android.graphics.BitmapFactory
 import android.hardware.*
 import android.hardware.display.DisplayManager
 import android.icu.util.Calendar
@@ -182,9 +183,13 @@ class WakeUpService : Service() {
 
         if (thread?.isAlive != true){
             val builder: Notification.Builder = Notification.Builder(this, NOTIFICATION_CHANNEL_STRING)
-                .setContentTitle(getString(R.string.app_name))
-                .setContentText("Foreground")
+                .setContentTitle("Waiting for notifications ")
+                .setContentText("If missed, screen will periodically turn on until you notice it")
                 .setAutoCancel(true)
+                .setSmallIcon(R.drawable.ic_stat_name)
+//                .setLargeIcon(
+//                    BitmapFactory.decodeResource(this.resources,
+//                    R.mipmap.ic_launcher))
 
             val notification: Notification = builder.build()
             startForeground(1, notification)
