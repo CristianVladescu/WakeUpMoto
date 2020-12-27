@@ -11,3 +11,5 @@ Runtime version: 1.8.0_242-release-1644-b01 amd64
 ```
  - the Motorola OEM USB drivers for the phone from https://developer.android.com/studio/run/oem-usb
  - and the phone in development mode by tapping 10 times `Build number` in `Settings > System > About phone`
+
+I've also added it on Play Store: https://play.google.com/store/apps/details?id=com.cdb.wakeupmoto
