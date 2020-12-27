@@ -2,8 +2,6 @@ package com.cdb.wakeupmoto
 
 import android.Manifest
 import android.app.AlertDialog
-import android.app.PendingIntent.FLAG_NO_CREATE
-import android.app.PendingIntent.getActivity
 import android.content.*
 import android.content.SharedPreferences.OnSharedPreferenceChangeListener
 import android.os.*
@@ -47,6 +45,7 @@ class MainActivity : AppCompatActivity(), PreferenceFragmentCompat.OnPreferenceS
                 }
             }
         }
+        if (key == "device_pickup_detection") { mService.devicePickupDetection = prefs.getBoolean(key, false) }
         if (key == "debug") { debug = prefs.getBoolean(key, false) }
         if (key == "displayCheckInterval" && mBound) { mService.displayCheckInterval = prefs.getString(key, "0")?.toInt()!! }
         if (key == "wake_up_interval" && mBound) { mService.wakeUpInterval = prefs.getString(key, "0")?.toInt()!! }

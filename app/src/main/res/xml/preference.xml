@@ -25,6 +25,11 @@
             android:key="enabled"
             android:title="Enabled"
             android:summary="Whether or not the service is enabled, causing the screen to light up until missed notifications are read"/>
+        <SwitchPreference
+            android:defaultValue="false"
+            android:key="device_pickup_detection"
+            android:title="Device pickup detection"
+            android:summary="Whether or not to use phone accelerometer and gyroscope sensors while awake, to determine if user read the notification and stop waking up (not needed in Android 10 update)"/>
         <EditTextPreference
             app:key="display_check_interval"
             app:title="Interval in seconds for checking if a notification arrived. Must be lower than 3 seconds, which is the duration the screen is on when a notification arrives"

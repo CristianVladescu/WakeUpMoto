@@ -8,7 +8,6 @@ import android.content.Context
 import android.content.Intent
 import android.content.IntentFilter
 import android.content.SharedPreferences
-import android.graphics.BitmapFactory
 import android.hardware.*
 import android.hardware.display.DisplayManager
 import android.icu.util.Calendar
@@ -65,23 +64,24 @@ class PhoneState {
     var liftToSilence = false
     var flipToMute = false
     var displayOnPreviously = true // display is physically light up (when Moto Display or anything else)
-    var displayTurnedOnByUser = false
+    var displayTurnedOnByUser = true
     var screenOnSinceDisplayOn = false // not true if only Moto Display is shown; only when unlock screen is shown it flips
     var screenUnlockedSinceDisplayOn = true
     var callAnsweredSinceDisplayOn = false
 }
 val phoneState = PhoneState()
 
-class StringCircularBuffer {
-    var array: Array<String>
+class CircularBuffer<T> {
+    var array: MutableList<T>
+
     var start = 0
     var end = 0
 
-    constructor(bufferSize: Int){
-        array = Array<String>(bufferSize) { _ -> "" }
+    constructor(bufferSize: Int, initValue: T){
+        array = MutableList<T>(bufferSize) { initValue }
     }
 
-    fun add(entry: String) {
+    fun add(entry: T) {
         array[end] = entry
         end = (end + 1) % array.size
         if (start == end)
@@ -95,7 +95,7 @@ var debug = true
 var errors = mutableListOf<String>()
 
 const val LOGGER_TAG = "WakeUpMoto::Logger"
-var logs = StringCircularBuffer(100)
+var logs = CircularBuffer<String>(100, "")
 fun log(msg: String){
     if (debug){
         logs.add(LocalDateTime.now().toString() + ": " + msg)
@@ -113,6 +113,7 @@ class WakeUpService : Service() {
     private var unreadNotifications = false
     private var unreadNotificationsCooldown = 0
     private var firstAlertTime = 0.toLong()
+    var devicePickupDetection = false
     var displayCheckInterval = -1
     var wakeUpInterval = -1
     var wakeUpStop = -1
@@ -159,6 +160,7 @@ class WakeUpService : Service() {
 //        errorsReady.tryLock()
         preferences = PreferenceManager.getDefaultSharedPreferences(this)
         debug = preferences.getBoolean("debug", false)
+        devicePickupDetection = preferences.getBoolean("device_pickup_detection", false)
         displayCheckInterval = preferences.getString("display_check_interval", "0")?.toInt()!!
         wakeUpInterval = preferences.getString("wake_up_interval", "0")?.toInt()!!
         wakeUpStop = preferences.getString("wake_up_stop", "0")?.toInt()!!
@@ -167,7 +169,7 @@ class WakeUpService : Service() {
 
         sensorManager = getSystemService(Context.SENSOR_SERVICE) as SensorManager;
         displayManager = getSystemService(Context.DISPLAY_SERVICE) as DisplayManager
-        
+
         val channel = NotificationChannel(NOTIFICATION_CHANNEL_STRING, "Wake Up Moto", NotificationManager.IMPORTANCE_DEFAULT)
         channel.description = "Notification indicating that Moto will be woken because there are other notifications"
 
@@ -211,10 +213,12 @@ class WakeUpService : Service() {
             errors.clear()
             if (!sensorList.any() { it.type == MotoSensors.MOTO_GLANCE_APPROACH_SENSOR.type }) { addError("Could not find ${MotoSensors.MOTO_GLANCE_APPROACH_SENSOR.name} sensor") }
             if (!sensorList.any() { it.type == MotoSensors.MOTO_GLANCE_SENSOR.type }) { addError("Could not find ${MotoSensors.MOTO_GLANCE_SENSOR.name} sensor") }
+            if (!sensorList.any() { it.type == Sensor.TYPE_ACCELEROMETER }) { addError("Could not find ${Sensor.STRING_TYPE_ACCELEROMETER} sensor") }
+            if (!sensorList.any() { it.type == Sensor.TYPE_GYROSCOPE }) { addError("Could not find ${Sensor.STRING_TYPE_GYROSCOPE} sensor") }
 
             for (sensor in sensorList) {
                 if (sensor.isWakeUpSensor && sensor.type in MotoSensors.values().map { i -> i.type}){
-                    log("Sensor: $sensor ${sensor.fifoMaxEventCount} ${sensor.fifoReservedEventCount}")
+//                    log("Sensor: $sensor ${sensor.fifoMaxEventCount} ${sensor.fifoReservedEventCount}")
                     sensorManager.registerListener(object: SensorEventListener{
                         override fun onAccuracyChanged(p0: Sensor?, p1: Int) { }
                         override fun onSensorChanged(p0: SensorEvent?) {
@@ -239,6 +243,7 @@ class WakeUpService : Service() {
             thread = Thread(Runnable {
 
                 var lastTime = System.currentTimeMillis()
+                var moitorKineticSensors = false
                 while (true){
                     var displayOn = false
                     for (display in displayManager.displays) {
@@ -247,13 +252,50 @@ class WakeUpService : Service() {
 //                            if (phoneState.screenUnlockedSinceDisplayOn){
 //                                phoneState.displayTurnedOnByUser = true
 //                            }
-                            if (!phoneState.displayOnPreviously)
+                            if (!phoneState.displayOnPreviously){
                                 log( "Display on")
+
+                                if (devicePickupDetection) {
+                                    // monitor gyro and accel while screen is on, and cancel alert if motion detected (assume notification was read)
+                                    moitorKineticSensors = true
+                                    // looks like Moto Glance sensor triggers properly now in A10
+                                    for (sensor in sensorList)
+                                        if (!sensor.isWakeUpSensor){
+                                            if (sensor.type in arrayOf(Sensor.TYPE_ACCELEROMETER, Sensor.TYPE_GYROSCOPE))
+                                                sensorManager.registerListener(object: SensorEventListener {
+                                                    override fun onAccuracyChanged(p0: Sensor?, p1: Int) { }
+                                                    override fun onSensorChanged(p0: SensorEvent?) {
+                                                        if (p0 != null) {
+                                                            if (p0!!.sensor.type == Sensor.TYPE_ACCELEROMETER) {
+                                                                var accel = p0!!.values.map { i -> i*i}.sum()
+                                                                if (accel > 200) // 9.8^2 is base
+                                                                {
+                                                                    log("Accel reached $accel")
+                                                                    phoneState.displayTurnedOnByUser = true
+                                                                    moitorKineticSensors = false
+                                                                }
+                                                            }
+                                                            if (p0!!.sensor.type == Sensor.TYPE_GYROSCOPE) {
+                                                                var gyro = p0!!.values.take(3).map { i -> i*i}.sum()
+                                                                if (gyro > 1)
+                                                                {
+                                                                    log("Gyro reached $gyro")
+                                                                    phoneState.displayTurnedOnByUser = true
+                                                                    moitorKineticSensors = false
+                                                                }
+                                                            }
+                                                            if (!moitorKineticSensors)
+                                                                sensorManager.unregisterListener(this)
+                                                        }}}, sensor, sensor.minDelay)
+                                        }
+                                }
+                            }
                             break
                         }
                     }
 
                     if (!displayOn) {
+                        moitorKineticSensors = false
                         if (unreadNotifications && notificationsAlertCooldown <= 0 && !phoneState.displayTurnedOnByUser && unreadNotificationsCooldown <= 0 && !phoneState.stowed)
                         {
                             log( "Unread notifications");
@@ -278,12 +320,18 @@ class WakeUpService : Service() {
                             if (phoneState.displayOnPreviously)
                             {
                                 log("Display off")
-                                if (unreadNotifications && phoneState.displayTurnedOnByUser)
-                                    // if motion sensor is triggered while screen lock acquired (not Moto Display)
-                                    // after lock screen is released, the Moto Displayed is shown as well, so it must be ignored and not treated as a notification
-                                    // basically if the phone is moved during the lock screen, Moto Display is queued to be shown after display turns off
-                                    // since the Moto Display is shown for 5 seconds, 10 will suffice
-                                    unreadNotificationsCooldown = 10
+                                if (phoneState.displayTurnedOnByUser) {
+                                    log("Display was turned on by user")
+                                    if (unreadNotifications) {
+                                        // if motion sensor is triggered while screen lock acquired (not Moto Display)
+                                        // after lock screen is released, the Moto Displayed is shown as well, so it must be ignored and not treated as a notification
+                                        // basically if the phone is moved during the lock screen, Moto Display is queued to be shown after display turns off
+                                        // since the Moto Display is shown for 5 seconds, 10 will suffice
+                                        lastTime = System.currentTimeMillis()
+                                        unreadNotificationsCooldown = 10
+                                    }
+                                }
+                                if (unreadNotificationsCooldown > 0) log("Notifications cooled down for $unreadNotificationsCooldown")
                                 unreadNotifications = !phoneState.displayTurnedOnByUser && unreadNotificationsCooldown <= 0 && !phoneState.callAnsweredSinceDisplayOn //&& !phoneState.screenUnlockedSinceDisplayOn
                                 if (!unreadNotifications)
                                     firstAlertTime = 0
